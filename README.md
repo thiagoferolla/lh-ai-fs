@@ -83,6 +83,70 @@ Build a multi-agent pipeline that analyzes these documents and produces a struct
 
 We run your eval suite as part of our review. Document how to run it in your README. We care more about thoughtful metric design than perfect scores — an eval that honestly reports 60% recall tells us more than one that reports 100% on cherry-picked cases.
 
+### Run the Verification Pipeline
+
+Start the backend, then call the analysis endpoint:
+
+```bash
+cd backend
+uvicorn main:app --reload --port 8002
+```
+
+```bash
+curl -X POST http://localhost:8002/analyze
+```
+
+The endpoint returns a structured JSON report with extracted citations, citation verification, quote checks, fact claims, cross-document findings, normalized flags, agent errors, metadata, and a one-paragraph judicial memo.
+
+### Run Evals
+
+From the backend directory:
+
+```bash
+cd backend
+python run_evals.py
+```
+
+The eval harness runs the pipeline on the included Rivera case file and compares the report against a small gold set of known flaws:
+
+- incident-date discrepancy
+- PPE discrepancy
+- unverified OSHA compliance claim
+- disputed Harmon/Apex control framing
+- overbroad Privette quote
+- weak limitations argument
+
+The eval uses semantic concept matching instead of exact `flag.id` matching. Each expected finding defines required concepts, accepted statuses, and confidence bounds, so LLM-generated IDs like `incident_date_march_14_2021` can still match the gold `date_discrepancy` finding when the substance is correct.
+
+Metrics reported:
+
+- `precision`: semantically matched core, weak, and aspirational flags divided by all produced flags
+- `core_recall`: matched core gold flags divided by expected core gold flags
+- `expanded_recall`: core plus aspirational findings, including real issues the current pipeline does not yet promote to flags
+- `weak_match_count`: semantically relevant core findings with imperfect status or confidence
+- `hallucination_rate`: unsupported non-uncertainty flags divided by all produced flags
+- `evidence_grounding_rate`: consistency findings whose evidence snippets appear in named non-MSJ source documents
+- `uncertainty_accuracy`: obscure citations correctly marked with uncertainty and low confidence
+- `mutation_pass_rate`: document mutations that remove the expected flag
+- `clean_case_false_positive_rate`: contradiction/fabrication flags emitted on a clean synthetic brief
+- `fabricated_citation_detection_rate`: detection of an obvious synthetic fabricated citation
+- `authority_source_grounding_rate`: citation checks grounded in retrieved source authority text; currently expected to be low because this implementation is LLM-only for legal authority
+- `quote_exact_verification_rate`: direct quote checks verified against source authority text; currently expected to be low without case-law retrieval
+
+This implementation requires `OPENAI_API_KEY`. The analysis agents call the LLM for extraction, authority verification, quote checking, fact consistency analysis, and judicial memo synthesis. If the key is missing or an LLM response fails schema validation, the affected agent records an error instead of using deterministic fallback logic.
+
+### Interpreting LLM Eval Results
+
+The LLM-only eval is designed to measure substance rather than deterministic labels. A finding can pass if its text contains the required concepts, uses an accepted status, and falls within the confidence range. Findings with the right substance but imperfect status or confidence are reported as `weak_matches`, not hallucinations.
+
+The eval still intentionally exposes model weaknesses:
+
+- Citation extraction recall shows whether the model found expected citations, including short-form citations like `Id. at 702`.
+- Uncertainty accuracy shows whether the model refuses to over-trust obscure authorities without source text.
+- Grounding checks require fact evidence to appear in non-MSJ source documents, not merely in the motion itself.
+- Authority and quote source-grounding rates remain low unless primary authority text is actually supplied or retrieved.
+- Mutation tests now look for semantic issues after document changes, not fixed flag IDs.
+
 ## AI Usage
 
 Use everything. That's the job. We want to see how you use it, not whether you do.
