@@ -13,9 +13,9 @@ class CitationExtractionResult(BaseModel):
 
 class CitationExtractorAgent(Agent[list[Citation]]):
     name = "CitationExtractorAgent"
-    prompt = "Extract legal citations from the MSJ with the proposition each citation is used to support. Return structured citations only."
+    prompt = "Extract every legal citation from the MSJ, including short-form and footnote authorities, with the proposition each supports."
 
-    llm_prompt = """You are a legal citation extraction agent. Extract every legal citation from the Motion for Summary Judgment.
+    llm_prompt = """You are a legal citation extraction agent. Extract every legal citation from the Motion for Summary Judgment with high recall.
 
 Return JSON only with this shape:
 {
@@ -37,8 +37,11 @@ Return JSON only with this shape:
 
 Rules:
 - Extract citations only from the MSJ, not from your own legal knowledge.
-- Include Id. citations when they are used as authority.
-- If a direct quote appears in the same sentence or line, put the exact quoted text in direct_quote.
+- Include short-form citations such as Id. citations when they are used as authority.
+- Extract each authority in footnotes and semicolon-separated citation strings as its own citation.
+- Extract statutes and code sections, including bare references such as California Code of Civil Procedure Section 335.1.
+- State the proposition narrowly from the surrounding MSJ text. Preserve material qualifiers such as never liable, OSHA compliance, rebuttable presumption, tort liability, and time-barred.
+- If a direct quote appears in the same sentence, line, or immediately before a citation, set has_direct_quote to true and put only the exact quoted words in direct_quote.
 - Do not verify whether the citation is correct. This agent only extracts.
 """
 
