@@ -162,7 +162,9 @@ This agent does not verify claims; it only identifies them for the consistency c
 
 **Output:** `str` (one paragraph)
 
-**Approach:** Synthesizes high-confidence findings into a single neutral paragraph written for a judge. Only includes findings with confidence >= 0.7. Does not overstate low-confidence citation issues. Uses template-based assembly rather than free-form generation to avoid introducing hallucinations.
+**Approach:** Synthesizes the normalized verification flags into a single neutral paragraph written for a judge. The memo agent is intentionally constrained to the already-built flags and is not responsible for extraction, fact verification, or legal authority analysis.
+
+**Model choice:** The memo uses the default `OPENAI_MODEL`, falling back to `gpt-4o-mini`. This is an intentional latency/cost tradeoff: summarization is lower risk than the upstream verification agents because the memo only rewrites structured findings that already exist. If a higher-quality narrative is needed, the model can be raised via `OPENAI_MODEL`, but the expected quality impact of `gpt-4o-mini` is limited to wording and nuance, not the underlying verification results.
 
 ---
 
@@ -170,7 +172,7 @@ This agent does not verify claims; it only identifies them for the consistency c
 
 **File:** `backend/agents/orchestrator.py`
 
-The orchestrator runs agents sequentially and builds the final report:
+The orchestrator runs dependency-aware agent waves and builds the final report. Independent LLM calls run concurrently to reduce endpoint latency while preserving the same typed report shape and failure handling:
 
 ```mermaid
 flowchart LR

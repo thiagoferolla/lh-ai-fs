@@ -31,12 +31,12 @@ def get_client() -> OpenAI:
 
 def call_llm(
     messages: list[dict],
-    model: str = "gpt-4o",
+    model: str | None = None,
     temperature: float = 0,
 ) -> str:
     """Call the OpenAI API and return the response content."""
     response = get_client().chat.completions.create(
-        model=model,
+        model=model or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         messages=messages,
         temperature=temperature,
     )
