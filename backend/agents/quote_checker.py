@@ -1,20 +1,13 @@
 from __future__ import annotations
 
-import json
-
-from llm import call_llm_json
-from pydantic import BaseModel, TypeAdapter
 from schemas import Citation, QuoteCheck
 
 from .base import Agent
 
 
-class QuoteCheckResult(BaseModel):
-    quote_checks: list[QuoteCheck]
-
-
 class QuoteCheckerAgent(Agent[list[QuoteCheck]]):
     name = "QuoteCheckerAgent"
+    
     prompt = "Check direct quotes adjacent to citations for exact-source limits and material overbreadth."
 
     llm_prompt = """You are a legal quote checking agent.
@@ -48,13 +41,22 @@ Rules:
 
     def run(self, citations: list[Citation]) -> list[QuoteCheck]:
         quoted_citations = [citation for citation in citations if citation.has_direct_quote and citation.direct_quote]
-        if not quoted_citations:
-            return []
-        result = call_llm_json(
-            messages=[
-                {"role": "system", "content": self.llm_prompt},
-                {"role": "user", "content": json.dumps([citation.model_dump() for citation in quoted_citations])},
-            ],
-            adapter=TypeAdapter(QuoteCheckResult),
-        )
-        return result.quote_checks
+        return [
+            QuoteCheck(
+                citation_id=citation.id,
+                quote=citation.direct_quote or "",
+                status="could_not_verify",
+                issue="Quote source text not provided",
+                source_basis=(
+                    "The motion includes a direct quote, but the primary authority text is not in the supplied case file. "
+                    "The pipeline does not use model memory or free-form web search to judge quote accuracy."
+                ),
+                confidence=0.2,
+                confidence_label="low",
+                reasoning=(
+                    "The quote can be extracted and reported, but exact quote accuracy cannot be verified without the "
+                    "source authority text."
+                ),
+            )
+            for citation in quoted_citations
+        ]

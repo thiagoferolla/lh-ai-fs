@@ -1,16 +1,8 @@
 from __future__ import annotations
 
-import json
-
-from llm import call_llm_json
-from pydantic import BaseModel, TypeAdapter
 from schemas import Citation, CitationVerification
 
 from .base import Agent
-
-
-class AuthorityVerificationResult(BaseModel):
-    citation_verifications: list[CitationVerification]
 
 
 class AuthorityVerifierAgent(Agent[list[CitationVerification]]):
@@ -51,11 +43,21 @@ Rules:
 """
 
     def run(self, citations: list[Citation]) -> list[CitationVerification]:
-        result = call_llm_json(
-            messages=[
-                {"role": "system", "content": self.llm_prompt},
-                {"role": "user", "content": json.dumps([citation.model_dump() for citation in citations])},
-            ],
-            adapter=TypeAdapter(AuthorityVerificationResult),
-        )
-        return result.citation_verifications
+        return [
+            CitationVerification(
+                citation_id=citation.id,
+                status="could_not_verify",
+                issue="Authority text not provided",
+                source_basis=(
+                    "The supplied case file does not include primary authority text for this citation. "
+                    "This pipeline intentionally does not use model memory or open-internet search to verify legal holdings."
+                ),
+                confidence=0.2,
+                confidence_label="low",
+                reasoning=(
+                    "The citation was extracted from the motion, but the cited authority itself is not among the provided "
+                    "documents, so support for the stated proposition cannot be verified from the available record."
+                ),
+            )
+            for citation in citations
+        ]
