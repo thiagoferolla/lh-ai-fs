@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+
+from llm import call_llm_json
+from pydantic import BaseModel
 from schemas import Citation, CitationVerification
 
 from .base import Agent
@@ -12,21 +16,6 @@ class AuthorityVerifierAgent(Agent[list[CitationVerification]]):
     llm_prompt = """You are a legal authority verification agent.
 
 Given citations extracted from a Motion for Summary Judgment, assess whether each cited authority supports the proposition the MSJ uses it for.
-
-Return JSON only with this shape:
-{
-  "citation_verifications": [
-    {
-      "citation_id": "citation_1",
-      "status": "supported|partially_supported|not_supported|could_not_verify|likely_fabricated",
-      "issue": "short issue or null",
-      "source_basis": "what you relied on, including whether this is LLM legal knowledge or lack of source text",
-      "confidence": 0.0,
-      "confidence_label": "low|medium|high",
-      "reasoning": "concise explanation"
-    }
-  ]
-}
 
 Rules:
 - Return one verification per input citation.
@@ -43,21 +32,11 @@ Rules:
 """
 
     def run(self, citations: list[Citation]) -> list[CitationVerification]:
-        return [
-            CitationVerification(
-                citation_id=citation.id,
-                status="could_not_verify",
-                issue="Authority text not provided",
-                source_basis=(
-                    "The supplied case file does not include primary authority text for this citation. "
-                    "This pipeline intentionally does not use model memory or open-internet search to verify legal holdings."
-                ),
-                confidence=0.2,
-                confidence_label="low",
-                reasoning=(
-                    "The citation was extracted from the motion, but the cited authority itself is not among the provided "
-                    "documents, so support for the stated proposition cannot be verified from the available record."
-                ),
-            )
-            for citation in citations
-        ]
+        result = call_llm_json(
+            messages=[
+                {"role": "system", "content": self.llm_prompt},
+                {"role": "user", "content": json.dumps([citation.model_dump() for citation in citations])},
+            ],
+            schema=AuthorityVerificationResult,
+        )
+        return result.citation_verifications

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from llm import call_llm_json
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 from schemas import Citation
 
 from .base import Agent
@@ -16,24 +16,6 @@ class CitationExtractorAgent(Agent[list[Citation]]):
     prompt = "Extract every legal citation from the MSJ, including short-form and footnote authorities, with the proposition each supports."
 
     llm_prompt = """You are a legal citation extraction agent. Extract every legal citation from the Motion for Summary Judgment with high recall.
-
-Return JSON only with this shape:
-{
-  "citations": [
-    {
-      "id": "citation_1",
-      "citation_text": "full citation text as it appears",
-      "authority_name": "case or statute name",
-      "reporter_or_statute": "reporter/statutory citation or null",
-      "proposition": "the proposition the MSJ uses this citation to support",
-      "context": "short surrounding MSJ text",
-      "line_start": 1,
-      "line_end": 1,
-      "has_direct_quote": false,
-      "direct_quote": null
-    }
-  ]
-}
 
 Rules:
 - Extract citations only from the MSJ, not from your own legal knowledge.
@@ -51,6 +33,6 @@ Rules:
                 {"role": "system", "content": self.llm_prompt},
                 {"role": "user", "content": motion_text},
             ],
-            adapter=TypeAdapter(CitationExtractionResult),
+            schema=CitationExtractionResult,
         )
         return [citation.model_copy(update={"id": f"citation_{index}"}) for index, citation in enumerate(result.citations, start=1)]

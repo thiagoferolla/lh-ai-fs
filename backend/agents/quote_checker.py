@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+
+from llm import call_llm_json
+from pydantic import BaseModel
 from schemas import Citation, QuoteCheck
 
 from .base import Agent
@@ -14,22 +18,6 @@ class QuoteCheckerAgent(Agent[list[QuoteCheck]]):
 
 Given extracted citations, review only citations that include direct_quote. Assess whether the quote is accurate, materially overbroad, unsupported, or impossible to verify from the available information.
 
-Return JSON only with this shape:
-{
-  "quote_checks": [
-    {
-      "citation_id": "citation_1",
-      "quote": "quoted text",
-      "status": "supported|partially_supported|not_supported|could_not_verify|likely_fabricated",
-      "issue": "short issue or null",
-      "source_basis": "what you relied on",
-      "confidence": 0.0,
-      "confidence_label": "low|medium|high",
-      "reasoning": "concise explanation"
-    }
-  ]
-}
-
 Rules:
 - Return checks only for citations with direct_quote.
 - Do not claim exact quote verification unless primary source text is present. If no primary text is present, state that in source_basis.
@@ -41,22 +29,13 @@ Rules:
 
     def run(self, citations: list[Citation]) -> list[QuoteCheck]:
         quoted_citations = [citation for citation in citations if citation.has_direct_quote and citation.direct_quote]
-        return [
-            QuoteCheck(
-                citation_id=citation.id,
-                quote=citation.direct_quote or "",
-                status="could_not_verify",
-                issue="Quote source text not provided",
-                source_basis=(
-                    "The motion includes a direct quote, but the primary authority text is not in the supplied case file. "
-                    "The pipeline does not use model memory or free-form web search to judge quote accuracy."
-                ),
-                confidence=0.2,
-                confidence_label="low",
-                reasoning=(
-                    "The quote can be extracted and reported, but exact quote accuracy cannot be verified without the "
-                    "source authority text."
-                ),
-            )
-            for citation in quoted_citations
-        ]
+        if not quoted_citations:
+            return []
+        result = call_llm_json(
+            messages=[
+                {"role": "system", "content": self.llm_prompt},
+                {"role": "user", "content": json.dumps([citation.model_dump() for citation in quoted_citations])},
+            ],
+            schema=QuoteCheckResult,
+        )
+        return result.quote_checks

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from llm import call_llm_json
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 from schemas import ConsistencyFinding, FactClaim
 
 from .base import Agent
@@ -20,24 +20,6 @@ class ConsistencyCheckerAgent(Agent[list[ConsistencyFinding]]):
     llm_prompt = """You are a cross-document legal fact consistency agent.
 
 Given factual claims extracted from a Motion for Summary Judgment and the source case-file documents, compare each claim against the non-MSJ source documents.
-
-Return JSON only with this shape:
-{
-  "consistency_findings": [
-    {
-      "claim_id": "same id as input claim",
-      "status": "supported|partially_supported|contradicted|not_found|could_not_verify",
-      "issue": "short issue or null",
-      "msj_claim": "the input MSJ claim",
-      "source_document": "document name or semicolon-separated names, or null",
-      "source_evidence": "exact supporting/contradicting source snippet, or null",
-      "source_basis": "concise explanation of the comparison",
-      "confidence": 0.0,
-      "confidence_label": "low|medium|high",
-      "reasoning": "concise explanation"
-    }
-  ]
-}
 
 Rules:
 - Return one finding per input claim.
@@ -78,6 +60,6 @@ Issue-specific guidance:
                     ),
                 },
             ],
-            adapter=TypeAdapter(ConsistencyCheckResult),
+            schema=ConsistencyCheckResult,
         )
         return result.consistency_findings
