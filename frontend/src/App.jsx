@@ -14,9 +14,31 @@ const badgeStyle = (severity) => ({
   borderRadius: '999px',
   fontSize: '12px',
   fontWeight: 700,
-  background: severity === 'high' ? '#fee2e2' : severity === 'medium' ? '#fef3c7' : '#e0f2fe',
-  color: severity === 'high' ? '#991b1b' : severity === 'medium' ? '#92400e' : '#075985',
+  background: severity === 'high' ? '#fee2e2' : severity === 'medium' ? '#fef3c7' : severity === 'success' ? '#dcfce7' : severity === 'neutral' ? '#f3f4f6' : '#e0f2fe',
+  color: severity === 'high' ? '#991b1b' : severity === 'medium' ? '#92400e' : severity === 'success' ? '#166534' : severity === 'neutral' ? '#374151' : '#075985',
 })
+
+const statusSeverity = (status) => {
+  const normalized = String(status || '').toLowerCase()
+
+  if (normalized.includes('could_not_verify')) {
+    return 'neutral'
+  }
+
+  if (normalized.includes('not found') || normalized.includes('unsupported') || normalized.includes('not supported') || normalized.includes('not_supported') || normalized.includes('contradicted')) {
+    return 'high'
+  }
+
+  if (normalized.includes('partial') || normalized.includes('partially_supported') || normalized.includes('unclear') || normalized.includes('inconsistent')) {
+    return 'medium'
+  }
+
+  if (normalized.includes('supported') || normalized.includes('found') || normalized.includes('consistent') || normalized.includes('verified')) {
+    return 'success'
+  }
+
+  return 'low'
+}
 
 function App() {
   const [report, setReport] = useState(null)
@@ -193,7 +215,9 @@ function Table({ rows, columns }) {
           {rows.map((row, index) => (
             <tr key={index}>
               {columns.map(([key]) => (
-                <td key={key} style={{ verticalAlign: 'top', borderBottom: '1px solid #f3f4f6', padding: '8px' }}>{String(row[key] || '')}</td>
+                <td key={key} style={{ verticalAlign: 'top', borderBottom: '1px solid #f3f4f6', padding: '8px' }}>
+                  {key === 'status' && row[key] ? <span style={badgeStyle(statusSeverity(row[key]))}>{String(row[key])}</span> : String(row[key] || '')}
+                </td>
               ))}
             </tr>
           ))}
