@@ -77,7 +77,7 @@ def _build_flags(
         if verification.status not in {"not_supported", "likely_fabricated"}:
             continue
         citation = citation_by_id.get(verification.citation_id)
-        flag_id = "privette_quote_overbroad" if citation and citation.citation_text.startswith("Id.") else f"citation_{verification.citation_id}"
+        flag_id = f"citation_{verification.citation_id}"
         if flag_id in flag_ids_seen:
             continue
         flag_ids_seen.add(flag_id)
@@ -100,7 +100,7 @@ def _build_flags(
     for check in quote_checks:
         if check.status not in {"not_supported", "likely_fabricated"}:
             continue
-        flag_id = "privette_quote_overbroad" if "never liable" in check.quote.lower() else f"quote_{check.citation_id}"
+        flag_id = f"quote_{check.citation_id}"
         if flag_id in flag_ids_seen:
             continue
         flag_ids_seen.add(flag_id)
