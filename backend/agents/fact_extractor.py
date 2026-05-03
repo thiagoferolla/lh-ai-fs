@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from llm import call_llm_json
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 from schemas import FactClaim
 
 from .base import Agent
@@ -17,20 +17,6 @@ class FactExtractorAgent(Agent[list[FactClaim]]):
 
     llm_prompt = """You are a legal fact extraction agent. Extract factual claims from the Motion for Summary Judgment that could be verified against source documents.
 
-Return JSON only with this shape:
-{
-  "fact_claims": [
-    {
-      "id": "short_snake_case_id",
-      "claim": "verifiable factual assertion from the MSJ",
-      "category": "incident_date|ppe|osha|control|limitations|injury_notice|other",
-      "context": "short surrounding MSJ text",
-      "line_start": 1,
-      "line_end": 1
-    }
-  ]
-}
-
 Rules:
 - Extract claims from the MSJ only.
 - Do not verify the claims.
@@ -45,6 +31,6 @@ Rules:
                 {"role": "system", "content": self.llm_prompt},
                 {"role": "user", "content": motion_text},
             ],
-            adapter=TypeAdapter(FactExtractionResult),
+            schema=FactExtractionResult,
         )
         return result.fact_claims

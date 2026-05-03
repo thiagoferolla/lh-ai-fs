@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from llm import call_llm_json
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
 from schemas import Citation, CitationVerification
 
 from .base import Agent
@@ -21,21 +21,6 @@ class AuthorityVerifierAgent(Agent[list[CitationVerification]]):
 
 Given citations extracted from a Motion for Summary Judgment, assess whether each cited authority supports the proposition the MSJ uses it for.
 
-Return JSON only with this shape:
-{
-  "citation_verifications": [
-    {
-      "citation_id": "citation_1",
-      "status": "supported|partially_supported|not_supported|could_not_verify|likely_fabricated",
-      "issue": "short issue or null",
-      "source_basis": "what you relied on, including whether this is LLM legal knowledge or lack of source text",
-      "confidence": 0.0,
-      "confidence_label": "low|medium|high",
-      "reasoning": "concise explanation"
-    }
-  ]
-}
-
 Rules:
 - Return one verification per input citation.
 - Do not pretend you retrieved primary authority text unless it is provided in the input.
@@ -50,6 +35,6 @@ Rules:
                 {"role": "system", "content": self.llm_prompt},
                 {"role": "user", "content": json.dumps([citation.model_dump() for citation in citations])},
             ],
-            adapter=TypeAdapter(AuthorityVerificationResult),
+            schema=AuthorityVerificationResult,
         )
         return result.citation_verifications
