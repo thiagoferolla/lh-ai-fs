@@ -9,6 +9,10 @@ from schemas import Citation, CitationVerification
 from .base import Agent
 
 
+class AuthorityVerificationResult(BaseModel):
+    citation_verifications: list[CitationVerification]
+
+
 class AuthorityVerifierAgent(Agent[list[CitationVerification]]):
     name = "AuthorityVerifierAgent"
     prompt = "Conservatively verify whether each cited authority supports the MSJ proposition, with explicit uncertainty when source text is unavailable."

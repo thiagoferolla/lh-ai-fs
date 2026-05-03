@@ -9,6 +9,10 @@ from schemas import Citation, QuoteCheck
 from .base import Agent
 
 
+class QuoteCheckResult(BaseModel):
+    quote_checks: list[QuoteCheck]
+
+
 class QuoteCheckerAgent(Agent[list[QuoteCheck]]):
     name = "QuoteCheckerAgent"
     
