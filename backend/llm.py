@@ -31,7 +31,7 @@ def call_llm(
     """Call the LLM through LangChain and return the response content."""
     _ensure_llm_available()
     llm = ChatOpenAI(
-        model=model,
+        model=model or os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         temperature=temperature,
         api_key=os.getenv("OPENAI_API_KEY"),
     )
