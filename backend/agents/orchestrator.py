@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
+
 from schemas import (
     AgentError,
     Citation,
@@ -21,18 +24,51 @@ from .judicial_memo import JudicialMemoAgent
 from .quote_checker import QuoteCheckerAgent
 
 
+@dataclass(frozen=True)
+class AgentRunResult:
+    agent_name: str
+    result: object | None = None
+    error: AgentError | None = None
+
+
 def run_analysis(documents: dict[str, str]) -> VerificationReport:
     agents_run: list[str] = []
     errors: list[AgentError] = []
     motion = documents.get("motion_for_summary_judgment", "")
 
-    citations: list[Citation] = _safe_run(CitationExtractorAgent(), errors, agents_run, motion) or []
-    citation_verifications: list[CitationVerification] = _safe_run(AuthorityVerifierAgent(), errors, agents_run, citations) or []
-    quote_checks: list[QuoteCheck] = _safe_run(QuoteCheckerAgent(), errors, agents_run, citations) or []
-    fact_claims: list[FactClaim] = _safe_run(FactExtractorAgent(), errors, agents_run, motion) or []
-    consistency_findings: list[ConsistencyFinding] = _safe_run(ConsistencyCheckerAgent(), errors, agents_run, fact_claims, documents) or []
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        citation_future = executor.submit(_safe_run, CitationExtractorAgent(), motion)
+        fact_future = executor.submit(_safe_run, FactExtractorAgent(), motion)
+
+        citation_result = citation_future.result()
+        _record_run(citation_result, errors, agents_run)
+        citations = citation_result.result or []
+
+        authority_future = executor.submit(_safe_run, AuthorityVerifierAgent(), citations)
+        quote_future = executor.submit(_safe_run, QuoteCheckerAgent(), citations)
+
+        fact_result = fact_future.result()
+        _record_run(fact_result, errors, agents_run)
+        fact_claims = fact_result.result or []
+
+        consistency_future = executor.submit(_safe_run, ConsistencyCheckerAgent(), fact_claims, documents)
+
+        authority_result = authority_future.result()
+        _record_run(authority_result, errors, agents_run)
+        citation_verifications = authority_result.result or []
+
+        quote_result = quote_future.result()
+        _record_run(quote_result, errors, agents_run)
+        quote_checks = quote_result.result or []
+
+        consistency_result = consistency_future.result()
+        _record_run(consistency_result, errors, agents_run)
+        consistency_findings = consistency_result.result or []
+
     flags = _build_flags(citations, citation_verifications, quote_checks, fact_claims, consistency_findings)
-    judicial_memo = _safe_run(JudicialMemoAgent(), errors, agents_run, flags)
+    judicial_memo_result = _safe_run(JudicialMemoAgent(), flags)
+    _record_run(judicial_memo_result, errors, agents_run)
+    judicial_memo = judicial_memo_result.result
 
     return VerificationReport(
         case_name="Rivera v. Harmon Construction Group",
@@ -51,14 +87,18 @@ def run_analysis(documents: dict[str, str]) -> VerificationReport:
     )
 
 
-def _safe_run(agent, errors: list[AgentError], agents_run: list[str], *args):
+def _safe_run(agent, *args) -> AgentRunResult:
     try:
-        result = agent.run(*args)
-        agents_run.append(agent.name)
-        return result
+        return AgentRunResult(agent_name=agent.name, result=agent.run(*args))
     except Exception as exc:  # noqa: BLE001 - agent failures should not take down report generation.
-        errors.append(AgentError(agent=agent.name, message=str(exc), recoverable=True))
-        return None
+        return AgentRunResult(agent_name=agent.name, error=AgentError(agent=agent.name, message=str(exc), recoverable=True))
+
+
+def _record_run(result: AgentRunResult, errors: list[AgentError], agents_run: list[str]) -> None:
+    if result.error:
+        errors.append(result.error)
+        return
+    agents_run.append(result.agent_name)
 
 
 def _build_flags(

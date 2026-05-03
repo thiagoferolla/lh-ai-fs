@@ -25,7 +25,7 @@ def _ensure_llm_available() -> None:
 
 def call_llm(
     messages: list[dict],
-    model: str = "gpt-4o",
+    model: str | None = None,
     temperature: float = 0,
 ) -> str:
     """Call the LLM through LangChain and return the response content."""
